@@ -22,6 +22,7 @@
         "symfony/form": "5.3.*",
         "symfony/framework-bundle": "5.3.*",
         "symfony/http-client": "5.3.*",
+        "symfony/http-foundation": "5.3.*",
         "symfony/intl": "5.3.*",
         "symfony/mailer": "5.3.*",
         "symfony/mime": "5.3.*",
@@ -97,6 +98,7 @@
         "symfony/debug-bundle": "5.3.*",
         "symfony/maker-bundle": "^1.0",
         "symfony/stopwatch": "5.3.*",
+        "symfony/var-dumper": "5.3.*",
         "symfony/web-profiler-bundle": "5.3.*"
     }
 }
