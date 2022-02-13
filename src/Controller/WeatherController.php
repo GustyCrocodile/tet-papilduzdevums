@@ -80,7 +80,7 @@ class WeatherController extends AbstractController
 	public function getIpAddress($request, $cache) 
 	{
 		$ip = $cache->get('ip_address', function (ItemInterface $item) use ($request) {
-		    $item->expiresAfter(60);
+		    $item->expiresAfter(3600);
 			// return new IpAddress($request->getClientIp());
 			// testing only
 			// return new IpAddress('72.31.205.212');
@@ -92,7 +92,7 @@ class WeatherController extends AbstractController
 	public function getLocation($ip, $cache) 
 	{
 		$location = $cache->get('location', function (ItemInterface $item) use ($ip) {
-		    $item->expiresAfter(60);
+		    $item->expiresAfter(3600);
 			$client = HttpClient::create();
 			$response = $client->request(
 				'GET', 
