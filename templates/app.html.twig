@@ -2,6 +2,16 @@
 
 {% block content %}
 
+{% if locationEmpty %}
+<p> Something went wrong </p>
+{% else %}
 <p> {{ weather }} </p>
+{% endif %}
+
+{#
+{{ form_widget(form.save, { 'label': 'Refresh location'})  }}
+#}
+
+{{ form(form) }}
 
 {% endblock %}

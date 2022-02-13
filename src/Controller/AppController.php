@@ -6,6 +6,15 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 
 class AppController
 {
+	// get weather
+	// get weather data
+	// get data
+	// get inof
+	// get weather info
+	// get all data
+	// get all
+	// get info
+	// 
 
 	// function getIp()
 	// get value from cache

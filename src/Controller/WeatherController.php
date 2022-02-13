@@ -10,30 +10,55 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpClient\HttpClient;
-use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Cache;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer;
+use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 
 class WeatherController extends AbstractController
 {
 	#[Route('/', name: 'app')]
-	public function show(Request $request, CacheInterface $cache)
+	#[Cache(maxage: 60)]
+	public function index(Request $request, CacheInterface $cache)
 	{
-		// $cache->delete('ip_address');
 		$ip = $this->getIpAddress($request, $cache);
-
-		// $cache->delete('location');
 		$location = $this->getLocation($ip, $cache);
+		
+		$form = $this->createFormBuilder()
+			->add('save', SubmitType::class, ['label' => 'Refresh Location'])
+			->getForm();
+      
+        $form->handleRequest($request);
+		if ($form->isSubmitted() && $form->isValid()) {
+			$ip = $this->resetIpAddress($request, $cache);
+			$location = $this->resetLocation($ip, $cache);
+		}
 
-		$weather = $this->getWeather($location);
-		$serializer = new Serializer([new ObjectNormalizer()], [new JsonEncoder()]);
-		$weatherJson = $serializer->serialize($weather, 'json');
+		$weather = null;
+		if (!$location->isEmpty()) {
+			$weather = $this->getWeather($location);
+		}
 
 		return $this->render('app.html.twig', [
-			'weather' => $weatherJson,
+			'weather' => $weather,
+			'locationEmpty' => $location->isEmpty(),
+			'form' => $form->createView(),
 		]);
+	}
+
+	public function resetLocation($ip, $cache) 
+	{
+		$cache->delete('location');
+		return $this->getLocation($ip, $cache);
+	}
+
+	public function resetIpAddress($request, $cache)
+	{
+		$cache->delete('ip_address');
+		return $this->getIpAddress($request, $cache);
 	}
 
 	public function getWeather($location)
@@ -47,23 +72,27 @@ class WeatherController extends AbstractController
 			$weatherContent->main->pressure,
 			$weatherContent->main->humidity
 		);
-		return $weather;
+		$serializer = new Serializer([new ObjectNormalizer()], [new JsonEncoder()]);
+		$weatherJson = $serializer->serialize($weather, 'json');
+		return $weatherJson;
 	}
 
 	public function getIpAddress($request, $cache) 
 	{
-		$ip = $cache->get('ip_address', function ($request) {
+		$ip = $cache->get('ip_address', function (ItemInterface $item) use ($request) {
+		    $item->expiresAfter(60);
 			// return new IpAddress($request->getClientIp());
 			// testing only
-			// return new IpAddress('72.31.205.212'); // 
-			return new IpAddress('78.84.205.212');
+			// return new IpAddress('72.31.205.212');
+			return new IpAddress('111.21.205.212');
 		});
 		return $ip;
 	}
 
 	public function getLocation($ip, $cache) 
 	{
-		$location = $cache->get('location', function () use ($ip) {
+		$location = $cache->get('location', function (ItemInterface $item) use ($ip) {
+		    $item->expiresAfter(60);
 			$client = HttpClient::create();
 			$response = $client->request(
 				'GET', 
@@ -74,7 +103,7 @@ class WeatherController extends AbstractController
 		});
 		return $location;
 	}
-	
+
 	public function requestWeather(Location $location) 
 	{
 		$client = HttpClient::create();

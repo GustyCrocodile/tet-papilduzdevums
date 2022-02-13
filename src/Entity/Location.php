@@ -13,7 +13,7 @@ class Location
 		$this->lon = $lon;
 	}
 
-	public function getLat(): float
+	public function getLat()
 	{
 		return $this->lat;
 	}
@@ -23,7 +23,7 @@ class Location
 		$this->lat = $lat;
 	}
 
-	public function getLon(): float
+	public function getLon()
 	{
 		return $this->lon;
 	}
@@ -31,5 +31,13 @@ class Location
 	public function setLon(float $lon): void
 	{
 		$this->lon = $lon;
+	}
+
+	public function isEmpty(): bool
+	{
+		if ($this->lat === null || $this->lon === null) {
+			return true;
+		}
+		return false;
 	}
 }
