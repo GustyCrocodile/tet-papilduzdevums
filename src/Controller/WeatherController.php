@@ -17,24 +17,27 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
+use Doctrine\Persistence\ManagerRegistry;
+use App\Repository\IpAddressRepository;
+use App\Repository\LocationRepository;
 
 class WeatherController extends AbstractController
 {
 	#[Route('/', name: 'app')]
 	#[Cache(maxage: 60)]
-	public function index(Request $request, CacheInterface $cache)
+	public function index(Request $request, LocationRepository $locationRepository, IpAddressRepository $ipAddressRepository, CacheInterface $cache, ManagerRegistry $doctrine)
 	{
-		$ip = $this->getIpAddress($request, $cache);
-		$location = $this->getLocation($ip, $cache);
+		$ip = $this->getIpAddress($request, $cache, $ipAddressRepository, $doctrine);
+		$location = $this->getLocation($ip, $cache, $locationRepository, $doctrine); 
 		
 		$form = $this->createFormBuilder()
 			->add('save', SubmitType::class, ['label' => 'Refresh Location'])
 			->getForm();
-      
         $form->handleRequest($request);
+
 		if ($form->isSubmitted() && $form->isValid()) {
-			$ip = $this->resetIpAddress($request, $cache);
-			$location = $this->resetLocation($ip, $cache);
+			$ip = $this->resetIpAddress($request, $cache, $ipAddressRepository, $doctrine);
+			$location = $this->resetLocation($ip, $cache, $locationRepository, $doctrine);
 		}
 
 		$weather = null;
@@ -49,16 +52,16 @@ class WeatherController extends AbstractController
 		]);
 	}
 
-	public function resetLocation($ip, $cache) 
+	public function resetLocation($ip, $cache, $locationRepository, $doctrine) 
 	{
 		$cache->delete('location');
-		return $this->getLocation($ip, $cache);
+		return $this->getLocation($ip, $cache, $locationRepository, $doctrine);
 	}
 
-	public function resetIpAddress($request, $cache)
+	public function resetIpAddress($request, $cache, $ipAddressRepository, $doctrine)
 	{
 		$cache->delete('ip_address');
-		return $this->getIpAddress($request, $cache);
+		return $this->getIpAddress($request, $cache, $ipAddressRepository, $doctrine);
 	}
 
 	public function getWeather($location)
@@ -77,29 +80,53 @@ class WeatherController extends AbstractController
 		return $weatherJson;
 	}
 
-	public function getIpAddress($request, $cache) 
+	public function getIpAddress($request, $cache, $ipAddressRepository, $doctrine) 
 	{
-		$ip = $cache->get('ip_address', function (ItemInterface $item) use ($request) {
+		$entityManager = $doctrine->getManager();
+		$ip = $cache->get('ip_address', function (ItemInterface $item) use ($request, $ipAddressRepository, $entityManager) {
 		    $item->expiresAfter(3600);
-			// return new IpAddress($request->getClientIp());
-			// testing only
-			// return new IpAddress('72.31.205.212');
-			return new IpAddress('111.21.205.212');
+			$ipAddress = $ipAddressRepository->findOneByIp('111.21.205.212');
+
+			if (!$ipAddress) {
+				// $ipAddress =  new IpAddress($request->getClientIp());
+				// testing only
+				// new IpAddress('72.31.205.212');
+				// new IpAddress('111.21.205.212');
+
+				$ipAddress =  new IpAddress('111.21.205.212');
+		        $entityManager->persist($ipAddress);
+		        $entityManager->flush();
+		        return $ipAddress; 
+			}
+			return $ipAddress;
 		});
 		return $ip;
 	}
 
-	public function getLocation($ip, $cache) 
+	public function getLocation(IpAddress $ip, $cache, $locationRepository, $doctrine) 
 	{
-		$location = $cache->get('location', function (ItemInterface $item) use ($ip) {
+		$entityManager = $doctrine->getManager();
+		$location = $cache->get('location', function (ItemInterface $item) use ($ip, $locationRepository, $entityManager) {  
 		    $item->expiresAfter(3600);
-			$client = HttpClient::create();
-			$response = $client->request(
-				'GET', 
-				"http://api.ipstack.com/{$ip->getIp()}?access_key={$this->getParameter('app.geolocation_api_key')}" 
-			);
-			$result = json_decode($response->getContent());
-			return new Location($result->latitude, $result->longitude);
+		    $locationFromDb = $ip->getLocation();
+		  	if ($ip->getLocation()) {
+				$locationData = $locationRepository->findOneByIp($ip->getLocation()->getId());
+		  	}
+
+		    if (!$locationFromDb) {
+				$client = HttpClient::create();
+				$response = $client->request(
+					'GET', 
+					"http://api.ipstack.com/{$ip->getIp()}?access_key={$this->getParameter('app.geolocation_api_key')}" 
+				);
+				$result = json_decode($response->getContent());
+				$weatherLocation = new Location($result->latitude, $result->longitude);
+		        $weatherLocation->setIp($ip);
+		        $entityManager->persist($weatherLocation);
+		        $entityManager->flush();
+		        return $weatherLocation;
+		    }
+			return $locationFromDb;
 		});
 		return $location;
 	}
